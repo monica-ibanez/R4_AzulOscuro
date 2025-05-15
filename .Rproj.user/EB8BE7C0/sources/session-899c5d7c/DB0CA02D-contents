@@ -1,0 +1,66 @@
+library(dplyr)
+library(ggplot2)
+library(cluster)
+library(FactoMineR)
+library(factoextra)
+library(tidyr)
+library(lubridate)
+
+tickets_enc <- tickets_enc %>% 
+  mutate(
+    num_ticket = paste(num_ticket, id_cliente_enc))
+
+
+tickets_enc <- tickets_enc %>%
+  mutate(DiaSemana = wday(dia, week_start = 1))
+
+
+datos_clientes <- tickets_enc %>%
+  group_by(id_cliente_enc) %>%
+  summarise(
+    total_compras = n(),  # Número total de compras (filas en la base de datos)
+  productos_distintos = n_distinct(cod_est),  # Número de productos únicos comprados
+  dias_activos = as.numeric(max(dia) - min(dia)),
+    compras_por_semana = ifelse(dias_activos > 0, n() / (dias_activos / 7), n()), # Evitar división por 0
+    compras_entre_semana = sum(DiaSemana %in% 1:5),  # Compras de lunes a viernes
+    compras_fin_de_semana = sum(DiaSemana %in% 6:7)   # Compras en sábado o domingo
+  ) %>%
+  ungroup()
+
+
+datos_clientes_norm <- as.data.frame(scale(datos_clientes[,-1]))  # Excluimos ClienteID
+
+set.seed(123)
+kmeans_result <- kmeans(datos_clientes_norm, centers = 4, nstart = 10)
+
+# Agregar los clusters a los datos originales
+datos_clientes$Cluster <- kmeans_result$cluster
+
+head(datos_clientes)
+
+id <- objetivos$objetivo1$obj
+recomendar_clientes_para_producto <- function(producto_id, matriz_clientes_productos, datos_clientes) {
+  # Verificar que el producto esté en la matriz
+  if (!(producto_id %in% colnames(matriz_clientes_productos))) {
+    warning(paste("Producto", producto_id, "no encontrado en la matriz"))
+    return(NA)
+  }
+  
+  # Filtrar clientes que NO han comprado el producto aún
+  clientes_candidatos <- rownames(matriz_clientes_productos)[matriz_clientes_productos[, producto_id] == 0]
+  
+  # Filtrar esos clientes en el dataset de clientes
+  clientes_candidatos <- datos_clientes %>% 
+    filter(id_cliente_enc %in% clientes_candidatos) %>% 
+    arrange(desc(total_compras)) %>%  # Ordenar por compras totales
+    head(10) %>%                      # Seleccionar los 10 clientes más activos
+    pull(id_cliente_enc) %>% 
+    as.character()  # Convertir a carácter para evitar factores
+  
+  return(clientes_candidatos)
+}
+# Aplicamos la función para el producto 14351005
+clientes_recomendados <- recomendar_clientes_para_producto("14351005", matriz_clientes_productos, datos_clientes)
+print(clientes_recomendados)
+
+length(clientes_recomendados)

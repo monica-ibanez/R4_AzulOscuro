@@ -1,0 +1,223 @@
+################################## LIBRERÍAS ###################################
+library(plotly)
+library(dplyr)
+
+############################# IMPORTACIÓN DE DATOS ############################# 
+datos = read.csv(file = "Datos/mkt_campaign_cluster.csv")
+
+######################### COMPROBACIÓN DE IMPORTACIÓN ##########################
+head(datos)
+tail(datos)
+dim(datos)
+colnames(datos)
+summary(datos)
+sum(is.na(datos))
+
+############################ CORRECCIÓN DE FORMATOS ############################ 
+str(datos)
+datos$Client_id = as.factor(datos$Client_id)
+datos$Education = as.factor(datos$Education)
+datos$Marital_Status = as.factor(datos$Marital_Status)
+datos$cluster = as.factor(datos$cluster)
+
+############################ TRATAMIENTO DE OUTLIERS ###########################
+#----------------------------- VARIABLES POR TIPO ------------------------------ 
+datos_num = datos %>% 
+  select(Income, Age, MntWines, MntFruits, MntMeatProducts, MntFishProducts, MntSweetProducts, MntGoldProds)
+datos_fac = datos %>% select(-all_of(colnames(datos_num)))
+
+#----------------------- FUNCIÓN DE CALCULO DE OUTLIERS ------------------------ 
+outliers = function(columna, alpha = 0.05, k    = 7, num.hampel = 3, num.percent = 5){
+  columna = as.numeric(columna)
+  if(length(columna) <= 50){
+    normal = shapiro.test(columna)
+  } else {
+    library(nortest)
+    normal = nortest::lillie.test(columna)
+  }
+  p_value = normal$p.value
+  if(p_value >= alpha){
+    library(EnvStats)
+    outlier = EnvStats::rosnerTest(columna, k = k)
+  } else {
+    media.h = mean(columna, na.rm = TRUE)
+    sdev.h = sd(columna, na.rm = TRUE)
+    min.h = media.h - num.hampel * sdev.h
+    max.h = media.h + num.hampel * sdev.h
+    outlier.hampel = ifelse(min.h < columna & columna < max.h, FALSE, TRUE)
+    min.p = quantile(columna, num.percent/100, na.rm = TRUE)
+    max.p = quantile(columna, 1-(num.percent/100), na.rm = TRUE)
+    outlier.percent = ifelse(min.p < columna & columna < max.p, FALSE, TRUE)
+    media.b = mean(columna, na.rm = TRUE)
+    IQR.b = IQR(columna, na.rm = TRUE)
+    Q1.b = quantile(columna, 0.25, na.rm = TRUE)
+    Q3.b = quantile(columna, 0.75, na.rm = TRUE)
+    min.b = Q1.b - 1.5 * IQR.b
+    max.b = Q1.b + 1.5 * IQR.b
+    outlier.boxplot = ifelse(min.b < columna & columna < max.b, FALSE, TRUE)
+    outlier = data.frame(Hampel = outlier.hampel, 
+                         Percent = outlier.percent, 
+                         Boxplot = outlier.boxplot)
+  }
+  return(outlier)
+}
+
+#--------------------------- DETECCIÓN DE OUTLIERS ---------------------------- 
+outliers.datos = list()
+for (i in 1:dim(datos_num)[2]) {
+  outliers.datos[[i]] = outliers(columna = (as.data.frame(datos_num[,i]))[,1])
+}
+names(outliers.datos) = colnames(datos_num)
+
+datos.outliers = data.frame()
+for (i in 1:length(outliers.datos)) {
+  for (j in 1:dim(outliers.datos[[i]])[2]) {
+    cant.outlier = sum(outliers.datos[[i]][,j])
+    datos.outliers[i,j] = cant.outlier
+  }
+}
+rownames(datos.outliers) = names(outliers.datos)
+colnames(datos.outliers) = colnames(outliers.datos[[1]])
+
+#--------------------------- IMPUTACIÓN DE OUTLIERS ---------------------------- 
+
+datos = cbind(datos_num,datos_fac) %>% select(all_of(colnames(datos)))
+
+################################### PARTE 5 ####################################
+#----------------------------- PALETA DE COLORES ------------------------------- 
+paleta_colores = c("#0044CC", #Azul brillante
+                   "#00A8E8", #Azul Cielo Intenso
+                   "#00CED1", #Turquesa
+                   "#004080", #Azul Profundo
+                   "#8B008B", #Púrpura Oscuro
+                   "#9400D3", #Violeta Intenso
+                   "#4B0082") #Índigo Profundo
+
+#---------------------- NIVEL EDUCATIVO DE CADA CLÚSTER ------------------------ 
+nivel_educativo_cluster = ggplot(datos, aes(x = cluster, fill = Education)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Nivel educativo de cada clúster",
+       x = "Clústeres",
+       y = "") +
+  scale_fill_manual("Nivel educativo", values = paleta_colores)
+ggplotly(nivel_educativo_cluster)
+ggsave(filename = "GRAFICOS/PARTE_5/Nivel_educativo_de_cada_cluster.jpg", 
+       plot = nivel_educativo_cluster)
+
+#---------------------------- EDAD DE CADA CLÚSTER ----------------------------- 
+edad_cluster = ggplot(datos, aes(x = cluster, y = Age, fill = cluster)) +
+  geom_boxplot() + 
+  scale_fill_manual("Clústeres", values = paleta_colores) +
+  labs(title = "Edad de cada clúster",
+       x = "Clústeres",
+       y = "Edad")
+ggplotly(edad_cluster)
+ggsave(filename = "GRAFICOS/PARTE_5/Edad_de_cada_cluster.jpg", 
+       plot = edad_cluster)
+
+#-------------------------- INGRESOS DE CADA CLÚSTER --------------------------- 
+ingresos_cluster = ggplot(datos, aes(x = cluster, y = Income, fill = cluster)) +
+  geom_violin() + 
+  scale_fill_manual("Clústeres", values = paleta_colores) +
+  labs(title = "Ingresos de cada clúster",
+       x = "Clústeres",
+       y = "Ingresos") 
+ggplotly(ingresos_cluster)
+ggsave(filename = "GRAFICOS/PARTE_5/Ingresos_de_cada_cluster.jpg", 
+       plot = ingresos_cluster)
+
+#----------------------------------- GASTOS ------------------------------------ 
+#GASTOS MEDIOS POR CLUSTER Y PRODUCTO
+Gastos_vinos = datos %>% 
+  group_by(cluster) %>% 
+  summarise(Gastos_vinos = mean(MntWines))
+Gastos_frutas = datos %>% 
+  group_by(cluster) %>% 
+  summarise(Gastos_frutas = mean(MntFruits))
+Gastos_carnes = datos %>% 
+  group_by(cluster) %>% 
+  summarise(Gastos_carnes = mean(MntMeatProducts))
+Gastos_pescados = datos %>% 
+  group_by(cluster) %>% 
+  summarise(Gastos_pescados = mean(MntFishProducts))
+Gastos_dulces = datos %>% 
+  group_by(cluster) %>% 
+  summarise(Gastos_dulces = mean(MntSweetProducts))
+Gastos_oros = datos %>% 
+  group_by(cluster) %>% 
+  summarise(Gastos_oros = mean(MntGoldProds))
+Gastos = Gastos_vinos %>%
+  inner_join(Gastos_frutas, by = "cluster") %>%
+  inner_join(Gastos_carnes, by = "cluster") %>%
+  inner_join(Gastos_pescados, by = "cluster") %>%
+  inner_join(Gastos_dulces, by = "cluster") %>%
+  inner_join(Gastos_oros, by = "cluster") 
+rm(Gastos_carnes, Gastos_frutas, Gastos_dulces, Gastos_oros, Gastos_pescados, Gastos_vinos)
+Gastos_datos = data.frame()
+for (i in 2:dim(Gastos)[2]) {
+  for (j in 1:dim(Gastos)[1]) {
+    nuevo_dato = Gastos[j,i]
+    colnames(nuevo_dato) = "Gasto_medio"
+    Gastos_datos = rbind(Gastos_datos, nuevo_dato)
+  }
+}
+Gastos_medios = cbind(Cluster = rep(1:5, 6), 
+                     Producto = c(rep("Vinos", 5), rep("Frutas", 5), rep("Carnes", 5), rep("Pescados", 5), rep("Dulces", 5), rep("Oros", 5)), 
+                     Gasto_medio = Gastos_datos)
+
+##### VISUALIZACIONES DE GASTOS #####
+#PORCENTAJE DE GASTO POR PRODUCTO DE CADA CLÚSTER
+Pct_gasto_producto_cluster = ggplot(Gastos_medios, aes(x = Cluster, y = Gasto_medio, fill = Producto)) +
+  geom_col(position = "fill") +
+  scale_fill_manual("Productos", values = paleta_colores) +
+  labs(title = "Porcentaje de gasto por producto de cada clúster",
+       x = "Clústeres",
+       y = "Porcentaje de gasto")
+ggplotly(Pct_gasto_producto_cluster)
+ggsave(filename = "GRAFICOS/PARTE_5/Porcentaje_de_gasto_por_producto_de_cada_clúster.jpg", 
+       plot = Pct_gasto_producto_cluster)
+
+#GASTO POR PRODUCTO DE CADA CLÚSTER
+Gasto_producto_cluster = ggplot(Gastos_medios, aes(x = Cluster, y = Gasto_medio, fill = Producto)) +
+  geom_col(position = "dodge") +
+  scale_fill_manual("Productos", values = paleta_colores) +
+  labs(title = "Gasto por producto de cada clúster",
+       x = "Clústeres",
+       y = "Gasto")
+ggplotly(Gasto_producto_cluster)
+ggsave(filename = "GRAFICOS/PARTE_5/Gasto_por_producto_de_cada_clúster.jpg", 
+       plot = Gasto_producto_cluster)
+
+#GASTO MEDIO DE CADA CLÚSTER
+datos = datos %>% 
+  mutate(Gastos = MntWines + MntFruits + MntMeatProducts + MntFishProducts + MntSweetProducts + MntGoldProds) 
+datos = datos %>%
+  inner_join(datos %>% group_by(cluster) %>% summarise(Gasto_medio_cluster = mean(Gastos)), by = "cluster")
+
+Gasto_medio_cluster = ggplot(datos %>% group_by(cluster) %>% summarise(Gasto_medio_cluster = mean(Gastos)), aes(x = cluster, y = Gasto_medio_cluster, fill = cluster)) +
+  geom_col() +
+  scale_fill_manual("Clústeres", values = paleta_colores) +
+  labs(title = "Gasto medio de cada clúster",
+       x = "Clústeres",
+       y = "Gasto medio")
+ggplotly(Gasto_medio_cluster)
+ggsave(filename = "GRAFICOS/PARTE_5/Gasto_medio_de_cada_cluster.jpg", 
+       plot = Gasto_medio_cluster)
+
+################################ TABLAS RESUMEN ################################
+datos %>% group_by(cluster) %>% summarise(Edad = mean(Age))
+datos = datos %>% mutate(Nivel_Educativo = ifelse(Education == "2n Cycle", 1,
+                                ifelse(Education == "Basic", 2,
+                                ifelse(Education == "Graduation", 3,
+                                ifelse(Education == "Master", 5, 4)))))
+datos %>% group_by(cluster) %>% summarise(Nivel_Educativo = mean(Nivel_Educativo))
+datos %>% group_by(cluster) %>% summarise(Ingresos = mean(Income))
+datos %>% group_by(cluster) %>% summarise(Gastos = mean(Gastos))
+
+colnames(datos)
+datos$Education
+# PERFIL PROMEDIO DE LOS CLÚSTERES
+# 2. *Tabla resumen*: Variables clave del "individuo promedio" de cada clúster.  
+# - *Interpretación*:  
+# - Sintetizar características únicas de cada clúster (ej: clúster 4: solteros, jóvenes, alto gasto en dulces).  
+

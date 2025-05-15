@@ -1,0 +1,34 @@
+library(Matrix)
+library(rsparse)
+library(recommenderlab)
+library(dplyr)
+train<-matrix(c(1, 5, 0, 5, 4,
+         5, 4, 4, 3, 2,
+         0, 4, 0, 0, 5,
+         4, 4, 1, 4, 0,
+         0, 4, 3, 5, 0,
+         2, 4, 3, 5, 3),byrow = T,ncol = 5)
+rownames(train)<-c("u1","u2","u3","u4","u5","u6")
+colnames(train)<-c("i1","i2","i3","i4","i5")
+sparsematrix<-as(train,"sparseMatrix")
+model <- WRMF$new( rank=2, lambda = 0.1, feedback = "implicit") 
+user_emb<-model$fit_transform(train)
+su<-similarity(as(user_emb,"realRatingMatrix"))
+item_emb <- modelo$components # matriz de factores de los items
+item_emb ; item_emb_n <- t(modelo$components)  
+su2<-similarity(as(item_emb,"realRatingMatrix"))
+
+modulo <- function(x){
+  if (is.matrix(x)){ 
+    sqrt(rowSums(x^2))
+  } else {
+    sqrt(sum(x^2))  
+  }}
+user_emb_n <- user_emb/modulo(user_emb) # normalizar
+item_emb_n_n <- item_emb/modulo(item_emb) # normalizar
+item_emb_n <- t(item_emb)/modulo(t(item_emb)) # normalizar y transponer
+
+
+item_emb_n %*% user_emb_n[rownames(user_emb_n)=="u1",]%>%   
+  sort(decreasing=TRUE, index.return = T)
+

@@ -1,0 +1,48 @@
+library(rsparse)
+matriz <- readRDS("Datos/TRansformados/matriz_sm.RDS")
+objetivos <- readRDS("Datos/objetivos.RDS")
+
+matriz_binaria <- matriz
+matriz_binaria@x <- ifelse(matriz_binaria@x > 0, 1, 0)
+
+productos_oferta <- objetivos$objetivo3$obj
+
+modelo_wrmf <- WRMF$new(rank = 50, lambda = 0.1, alpha = 40, feedback = "implicit")
+
+matriz_factorizada <- modelo_wrmf$fit_transform(
+  x = matriz_binaria,
+  n_iter = 10,          # Número de iteraciones
+  convergence_tol = 1e-4  # Tolerancia para convergencia
+)
+
+
+productos_oferta_indices <- which(colnames(matriz_binaria) %in% productos_oferta)
+
+recomendaciones_oferta <- lapply(1:num_clientes, function(cliente_id) {
+  # Predecir para un cliente
+  predicciones <- modelo_wrmf$predict(
+    x = matriz_binaria[cliente_id, , drop = FALSE],
+    k = 1,  # Solo queremos 1 recomendación
+    items_exclude = (1:ncol(matriz_binaria))[-productos_oferta_indices]  # Excluir los que no están en oferta
+  )
+  
+  # Extraer el código del producto recomendado
+  as.character(attr(predicciones, "ids"))
+})
+
+# Crear el data frame final
+recomendaciones_oferta_df <- data.frame(
+  cliente_id = rownames(matriz_binaria),
+  producto_recomendado = unlist(recomendaciones_oferta)
+)
+
+# Confirmar que el número de recomendaciones es correcto
+length(recomendaciones_oferta_df$producto_recomendado)
+
+# Ver el número de recomendaciones por cliente
+table(recomendaciones_oferta_df$producto_recomendado)
+head(recomendaciones_oferta_df)
+
+dim(matriz_binaria)
+
+table(recomendaciones_oferta)

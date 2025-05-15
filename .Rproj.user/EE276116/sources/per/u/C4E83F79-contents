@@ -1,0 +1,24 @@
+if(!require(lubridate)){
+  install.packages("lubridate")}
+if(!require(dplyr)){
+  install.packages("dplyr")}
+if(!require(naniar)){
+  install.packages("naniar")}
+if(!require(tidyr)){
+  install.packages("tidyr")}
+if(!require(Matrix)){
+  install.packages("Matrix")}
+if(!require(Isa)){
+  install.packages("Isa")}
+
+library(lubridate)
+library(dplyr)
+library(naniar)
+library(tidyr)
+library(Matrix)
+library(Isa)
+
+
+saveRDS(matriz_clientes_productos, "Datos/Transformados/matriz_recomendacion.RDS")
+
+objetivos$objetivo3

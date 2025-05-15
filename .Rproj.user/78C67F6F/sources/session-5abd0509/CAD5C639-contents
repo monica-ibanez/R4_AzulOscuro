@@ -1,0 +1,36 @@
+library(shiny)
+library(bslib)
+
+ui <- page_navbar(
+  title = "Demo Navegación Avanzada",
+  
+  # Página 1: Clásica con subpestañas horizontales
+  nav_panel("Análisis",
+            navset_tab(
+              tabPanel("Resumen", p("Aquí va el resumen del análisis.")),
+              tabPanel("Gráficos", p("Gráficos dinámicos con Plotly o ggplot2.")),
+              tabPanel("Modelo", p("Resultados del modelo predictivo."))
+            )
+  ),
+  
+  # Página 2: Subpestañas como píldoras horizontales
+  nav_panel("Reportes",
+            navset_pill(
+              tabPanel("PDF", p("Generación de reportes en PDF.")),
+              tabPanel("Excel", p("Exportación a Excel."))
+            )
+  ),
+  
+  # Página 3: Píldoras verticales (estilo menú lateral)
+  nav_panel("Configuración",
+            navset_pill_list(
+              tabPanel("General", p("Configuraciones generales de la app.")),
+              tabPanel("Avanzado", p("Opciones avanzadas del sistema."))
+            )
+  )
+)
+
+server <- function(input, output, session) {}
+
+
+shinyApp(ui, server)

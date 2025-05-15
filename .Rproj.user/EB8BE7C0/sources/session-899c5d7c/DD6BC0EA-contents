@@ -1,0 +1,25 @@
+# Paso 1: Calcular los días de la semana (lunes = 1, domingo = 7)
+tickets_enc$dia_semana <- wday(tickets_enc$dia, week_start = 1)  # Usamos 1 como lunes
+
+# Paso 2: Calcular el número de días activos por cliente (días únicos de compra)
+df_dias_activos <- tickets_enc %>%
+  group_by(id_cliente_enc) %>%
+  summarise(dias_activos = n_distinct(dia_semana))  # Contamos los días únicos de compra
+
+# Paso 3: Calcular otras columnas, como las compras por semana (suponiendo que tenemos una variable `fecha`)
+tickets_enc$semana <- week(tickets_enc$dia)  # Obtenemos la semana del año
+tickets_enc$anio <- year(tickets_enc$dia)    # Obtenemos el año
+
+# Paso 4: Crear la columna de compras por semana
+df_compras_semanales <- tickets_enc %>%
+  group_by(id_cliente_enc, semana, anio) %>%
+  summarise(compras_por_semana = n())
+
+# Paso 5: Combinar todas las columnas en un solo data frame
+df_resultado <- df_dias_activos %>%
+  left_join(df_compras_semanales %>%
+              group_by(id_cliente_enc) %>%
+              summarise(total_compras = sum(compras_por_semana)),
+            by = "id_cliente_enc")
+
+str(matriz_clientes_productos)

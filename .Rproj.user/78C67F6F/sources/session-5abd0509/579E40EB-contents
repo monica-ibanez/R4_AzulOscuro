@@ -1,0 +1,78 @@
+##### Evaluacion de clasificadores
+
+# Podemos evaluar la efectividad de un modelo alterando diferentes parametros y elegir el mejor.
+library(recommenderlab)
+library(ggplot2)
+library(dplyr)
+data(MovieLense)
+colnames(MovieLense)
+class(MovieLense)
+dim(MovieLense)
+class(MovieLense)
+colCounts(MovieLense)
+#filtrado de instancias y columnas
+ratings_movies1 <- MovieLense[rowCounts(MovieLense) > 50,]
+ratings_movies <- ratings_movies1[,
+                                  colCounts(ratings_movies1) > 100]
+
+dim(ratings_movies)
+#estadisticos
+max;min
+
+
+### 1a opcion. dividir los datos
+
+# El dataset se divide en 2.  El numero de items "given" para generar recomendaciones
+# debe ser menor que el minimo de articulos adquiridos/recomendados por cada usuario, para que
+# no tengamos usuarios sin items para probar los modelos
+
+min(rowCounts(ratings_movies)) # si el minimo es 18, nos quedaremos al menos con 17
+
+eval_sets <- evaluationScheme(data = ratings_movies,
+                              method = "split", train = 0.8,
+                              given = 15, goodRating = 2)
+# train : train set
+# known : test set para construir las recomendaciones
+# unknown : test set para evaluar las recomendaciones
+
+nrow(getData(eval_sets, "train"))/nrow(ratings_movies)#% para train
+nrow(getData(eval_sets, "known"))/nrow(ratings_movies)#el 20% restante
+nrow(getData(eval_sets, "known"))
+nrow(getData(eval_sets, "unknown")) # tienen el mismo num. de usuarios y son el 20%
+unique(rowCounts(getData(eval_sets, "known"))) # 15 articulos por usuario
+
+
+
+##############################################################################################
+### Evaluacion de los modelos (Ratings)
+##############################################################################################
+
+eval_reccomender <- Recommender(getData(eval_sets,"train"),
+                                "IBCF", 
+                                param = NULL)
+eval_reccomender
+
+eval_prediction <- predict(object = eval_reccomender, 
+                           newdata = getData(eval_sets, "known"),
+                           type = "ratings")
+
+eval_prediction@data# muestra la matriz de puntuaciones predichas
+dim(eval_prediction@data)
+rowCounts(eval_prediction) %>% 
+  as("matrix")%>% 
+  sum()
+
+eval_prediction@normalize # si  se ha normalizado o no
+dim(getData(eval_sets, "unknown"))
+eval_accuracy <- calcPredictionAccuracy(eval_prediction,
+                                        getData(eval_sets, "unknown"),
+                                        byUser = TRUE)#los indicadores de error se dan por usuario
+
+dim(eval_accuracy)
+#si quisiera que me diese solo la media para todos los usuarios
+
+eval_accuracy <- calcPredictionAccuracy(eval_prediction,
+                                        getData(eval_sets, "unknown"))
+
+
+eval_accuracy #solo una fila porque no he modificado ningun parametro

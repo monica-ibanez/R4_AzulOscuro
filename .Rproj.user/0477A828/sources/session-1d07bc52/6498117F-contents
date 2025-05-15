@@ -1,0 +1,362 @@
+library(shiny)
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(DT)
+library(plotly)
+
+# Paletas de colores
+eroski_colores <- c(
+  "#E6001F", "#CC001C", "#FF3347", "#B30019", "#990015",
+  "#005FAA", "#004C88"
+)
+paleta3 <- c("#FF3347", "#FFFFFF", "#005FAA")
+
+# Cargar datos
+df_ticket <- read.csv("Datos/Transformados/tickets_enc_Bien.csv")
+df_maestro <- read.csv("Datos/Transformados/maestroestr.csv")
+df <- merge(df_ticket, df_maestro, by = "cod_est")
+df$dia <- as.Date(df$dia)
+
+df_cluster <- read.csv("Resultados/clientes_con_cluster.csv")
+df_cluster$Cluster <- as.factor(df_cluster$Cluster)
+df_cluster <- df_cluster[,-1]
+
+# PCA para el gráfico 3D
+df_numeric <- df_cluster %>% select(where(is.numeric))
+pca <- prcomp(df_numeric, scale. = TRUE)
+df_pca3d <- as.data.frame(pca$x[, 1:3])
+colnames(df_pca3d) <- c("PC1", "PC2", "PC3")
+df_pca3d$Cluster <- df_cluster$Cluster
+
+# Datos preprocesados para exploratorio
+ventas_por_mes <- df %>%
+  mutate(Mes = month(dia, label = TRUE, abbr = FALSE)) %>%
+  group_by(Mes) %>%
+  summarise(Total = n())
+
+df$dia_semana <- wday(df$dia, label = TRUE, abbr = FALSE, week_start = 1)
+df$dia_semana <- factor(df$dia_semana,
+                        levels = c("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"))
+ventas_por_dia <- df %>%
+  group_by(dia_semana) %>%
+  summarise(cantidad = n())
+
+# UI
+ui <- navbarPage(
+  "EROSKI",
+  
+  tabPanel("Análisis exploratorio",
+           sidebarLayout(
+             sidebarPanel(
+               h4("Resumen de datos"),
+               verbatimTextOutput("info_general"),
+               selectInput("cliente_select", "Selecciona cliente:", choices = NULL),
+               verbatimTextOutput("cliente_resumen"),
+               conditionalPanel(
+                 condition = "input.subtab == 'productos'",
+                 sliderInput("n_productos", "Número de productos a mostrar:", min = 5, max = 30, value = 10)
+               ),
+               conditionalPanel(
+                 condition = "input.subtab == 'producto_mes'",
+                 selectInput("producto_seleccionado", "Selecciona un producto:", choices = NULL)
+               )
+             ),
+             mainPanel(
+               tabsetPanel(id = "subtab",
+                           tabPanel("Productos más vendidos", value = "productos", DTOutput("tabla_productos")),
+                           tabPanel("Ventas por mes", value = "mes", plotlyOutput("grafico_mes")),
+                           tabPanel("Día de la semana", value = "dia", plotOutput("plot_dia")),
+                           tabPanel("Producto por mes", value = "producto_mes", plotOutput("plot_producto_mes"))
+               )
+             )
+           )
+  ),
+  
+  tabPanel("Visualización de cada cluster",
+           fluidPage(
+             h3("Visualización de clusters", style = "color: #005FAA;"),
+             
+             h4("Representación 3D de los clusters"),
+             p("Este gráfico 3D muestra cómo se distribuyen los clientes en función de los tres primeros componentes principales (PCA), considerando variables como:"),
+             tags$ul(
+               tags$li("Total de productos comprados"),
+               tags$li("Número de productos distintos"),
+               tags$li("Días activos"),
+               tags$li("Media de compras por semana"),
+               tags$li("Compras entre semana y fin de semana")
+             ),
+             plotlyOutput("plot_cluster_3d"),
+             br(),
+             
+             h4("Descripción de los clusters:"),
+             tags$ul(
+               tags$li(strong("Cluster 1:"), " Clientes muy activos, con gran volumen de compra y diversidad."),
+               tags$li(strong("Cluster 2:"), " Clientes de comportamiento medio y frecuencia moderada."),
+               tags$li(strong("Cluster 3:"), " Clientes esporádicos con pocas compras y baja variedad.")
+             ),
+             
+             br(),
+             
+             h4("Total de productos comprados por Cluster"),
+             plotOutput("plot_total_productos"),
+             br(),
+             
+             h4("Productos distintos comprados por Cluster"),
+             plotOutput("plot_productos_distintos"),
+             br(),
+             
+             h4("Media de días activos por Cluster"),
+             plotOutput("plot_dias_activos"),
+             br(),
+             
+             h4("Media de productos diferentes comprados por semana"),
+             plotOutput("plot_media_por_semana"),
+             br(),
+             
+             h4("Productos comprados entre semana por Cluster"),
+             plotOutput("plot_entre_semana"),
+             br(),
+             
+             h4("Productos comprados fin de semana por Cluster"),
+             plotOutput("plot_fin_semana")
+           )
+  ),
+  
+  tabPanel("Resultado de modelización",
+           fluidPage(
+             h3("Modelización de comportamiento"),
+             verbatimTextOutput("modelo_placeholder")
+           )
+  )
+)
+
+# SERVER
+server <- function(input, output, session) {
+  
+  output$info_general <- renderPrint({
+    total_tickets <- nrow(df)
+    total_clientes <- n_distinct(df$id_cliente_enc)
+    cat("Total de tickets:", total_tickets, "\n")
+    cat("Clientes distintos:", total_clientes)
+  })
+  
+  observe({
+    updateSelectInput(session, "cliente_select", choices = sort(unique(df$id_cliente_enc)))
+    updateSelectInput(session, "producto_seleccionado", choices = sort(unique(df$descripcion)))
+  })
+  
+  output$cliente_resumen <- renderPrint({
+    req(input$cliente_select)
+    cliente_df <- df %>% filter(id_cliente_enc == input$cliente_select)
+    top_prod <- cliente_df %>%
+      count(descripcion, sort = TRUE) %>%
+      slice_head(n = 3)
+    cat("Productos más comprados por el cliente:\n")
+    apply(top_prod, 1, function(row) cat("- ", row[1], "(", row[2], " veces)\n"))
+  })
+  
+  output$tabla_productos <- renderDT({
+    top_n <- input$n_productos
+    productos_top <- df %>%
+      group_by(descripcion) %>%
+      summarise(frecuencia = n()) %>%
+      arrange(desc(frecuencia)) %>%
+      slice_head(n = top_n)
+    datatable(productos_top, options = list(pageLength = top_n), rownames = FALSE)
+  })
+  
+  output$grafico_mes <- renderPlotly({
+    colores_usados <- eroski_colores[1:nrow(ventas_por_mes)]
+    plot_ly(
+      ventas_por_mes,
+      labels = ~Mes,
+      values = ~Total,
+      type = "pie",
+      marker = list(colors = colores_usados),
+      textposition = 'inside',
+      textinfo = 'label+percent',
+      hoverinfo = 'text',
+      text = ~paste("Mes:", Mes, "<br>Total:", Total)
+    ) %>% layout(title = "Total de productos por mes (Pastel)", showlegend = TRUE)
+  })
+  
+  output$plot_dia <- renderPlot({
+    ggplot(ventas_por_dia, aes(x = dia_semana, y = cantidad)) +
+      geom_col(fill = eroski_colores[2]) +
+      labs(title = "Compras por día de la semana", x = "Día", y = "Cantidad") +
+      theme_minimal()
+  })
+  
+  output$plot_producto_mes <- renderPlot({
+    req(input$producto_seleccionado)
+    datos <- df %>%
+      filter(descripcion == input$producto_seleccionado) %>%
+      mutate(Mes = month(dia, label = TRUE, abbr = FALSE)) %>%
+      group_by(Mes) %>%
+      summarise(Frecuencia = n()) %>%
+      arrange(Mes)
+    ggplot(datos, aes(x = Mes, y = Frecuencia)) +
+      geom_col(fill = eroski_colores[6]) +
+      labs(title = paste("Compras por mes del producto:", input$producto_seleccionado),
+           x = "Mes", y = "Cantidad") +
+      theme_minimal()
+  })
+  
+  # Gráfico 3D de clusters
+  output$plot_cluster_3d <- renderPlotly({
+    plot_ly(
+      df_pca3d,
+      x = ~PC1, y = ~PC2, z = ~PC3,
+      type = "scatter3d",
+      mode = "markers",
+      color = ~Cluster,
+      colors = paleta3,
+      marker = list(size = 4, opacity = 0.8)
+    ) %>%
+      layout(title = "Proyección 3D de los clusters (PCA)")
+  })
+  
+  output$plot_total_productos <- renderPlot({
+    ggplot(df_cluster, aes(x = Cluster, y = total_productos, fill = Cluster)) +
+      geom_boxplot() +
+      labs(x = "Cluster", y = "Total de productos comprados") +
+      scale_fill_manual("Cluster", values = paleta3) +
+      scale_y_continuous(breaks = seq(0, 325, 25)) +
+      theme_minimal()
+  })
+  
+  output$plot_productos_distintos <- renderPlot({
+    ggplot(df_cluster, aes(x = Cluster, y = productos_distintos, fill = Cluster)) +
+      geom_violin() +
+      labs(x = "Cluster", y = "Cantidad de productos distintos") +
+      scale_fill_manual("Cluster", values = paleta3) +
+      scale_y_continuous(breaks = seq(0, 175, 25)) +
+      theme_minimal()
+  })
+  
+  output$plot_dias_activos <- renderPlot({
+    damedia <- df_cluster %>%
+      group_by(Cluster) %>%
+      summarise(media = mean(dias_activos))
+    ggplot(damedia, aes(x = Cluster, y = media, fill = Cluster)) +
+      geom_col(color = "#000000") +
+      labs(x = "Cluster", y = "Media de días activos") +
+      scale_fill_manual("Cluster", values = paleta3) +
+      scale_y_continuous(breaks = seq(0, 3, 1)) +
+      theme_minimal()
+  })
+  
+  output$plot_media_por_semana <- renderPlot({
+    ggplot(df_cluster, aes(x = Cluster, y = media_compras_por_semana, fill = Cluster)) +
+      geom_boxplot() +
+      labs(x = "Cluster", y = "Media de productos por semana") +
+      scale_fill_manual("Cluster", values = paleta3) +
+      theme_minimal()
+  })
+  
+  output$plot_entre_semana <- renderPlot({
+    ggplot(df_cluster, aes(x = Cluster, y = compras_entre_semana, fill = Cluster)) +
+      geom_boxplot() +
+      labs(x = "Cluster", y = "Compras de lunes a jueves") +
+      scale_fill_manual("Cluster", values = paleta3) +
+      scale_y_continuous(breaks = seq(0, 275, 25)) +
+      theme_minimal()
+  })
+  
+  output$plot_fin_semana <- renderPlot({
+    ggplot(df_cluster, aes(x = Cluster, y = compras_fin_de_semana, fill = Cluster)) +
+      geom_boxplot() +
+      labs(x = "Cluster", y = "Compras de viernes a domingo") +
+      scale_fill_manual("Cluster", values = paleta3) +
+      scale_y_continuous(breaks = seq(0, 75, 25)) +
+      theme_minimal()
+  })
+  
+  output$modelo_placeholder <- renderPrint({
+    cat("Aquí irán los resultados del modelo de predicción o clasificación.")
+  })
+}
+
+# Ejecutar app
+shinyApp(ui = ui, server = server)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+##
+select_var_num = function(df){
+  df_num = df %>% select(where(is.numeric))
+  return(df_num)
+}
+df_cluster$Cluster<- as.factor(df_cluster$Cluster)
+df_cluster<- df_cluster[,-1]
+df_names = colnames(df_cluster)
+df_num = select_var_num(df_cluster)
+df_cha = df_cluster %>% select(-all_of(colnames(df_num)))
+str(df_cluster)
+
+
+paleta = c("#E6001F", "#CC001C", "#FF3347", "#B30019", "#990015" ,"#005FAA", "#004C88")
+paleta3 = c("#FF3347", "#FFFFFF", "#005FAA")
+
+ggplot(df_cluster, aes(x = Cluster, y = total_productos, fill = Cluster)) +
+  geom_boxplot() +
+  labs(title = "Total de productos comprados por Cluster",
+       x = "Cluster", 
+       y = "Total de productos comprados") +
+  scale_fill_manual("Cluster", values = paleta3) +
+  scale_y_continuous(breaks = seq(0,325, 25))
+
+ggplot(df_cluster, aes(x = Cluster, y = productos_distintos, fill = Cluster)) +
+  geom_violin() +
+  labs(title = "Cantidad de productos distintos comprados por Cluster",
+       x = "Cluster", 
+       y = "Cantidad de productos distintos comprados") +
+  scale_fill_manual("Cluster", values = paleta3) +
+  scale_y_continuous(breaks = seq(0, 175, 25))
+
+damedia = df_cluster %>% group_by(Cluster) %>% summarise(media = mean(dias_activos))
+
+ggplot(damedia, aes(x = Cluster, y = media, fill = Cluster)) +
+  geom_col(color = "#000000") +
+  labs(title = "Media de días activos por Cluster",
+       x = "Cluster", 
+       y = "Media de días activos") +
+  scale_fill_manual("Cluster", values = paleta3) +
+  scale_y_continuous(breaks = seq(0,3,1))
+
+ggplot(df_cluster, aes(x = Cluster, y = media_compras_por_semana, fill = Cluster)) +
+  geom_boxplot() +
+  labs(title = "Media de productos diferentes comprados por semana por Cluster",
+       x = "Cluster", 
+       y = "Media de productos diferentes comprados por semana") +
+  scale_fill_manual("Cluster", values = paleta3) 
+
+ggplot(df_cluster, aes(x = Cluster, y = compras_entre_semana, fill = Cluster)) +
+  geom_boxplot() +
+  labs(title = "Productos diferentes comprados de lunes a jueves por Cluster",
+       x = "Cluster", 
+       y = "Productos diferentes comprados de lunes a jueves") +
+  scale_fill_manual("Cluster", values = paleta3) +
+  scale_y_continuous(breaks = seq(0, 275, 25))
+
+ggplot(df_cluster, aes(x = Cluster, y = compras_fin_de_semana, fill = Cluster)) +
+  geom_boxplot() +
+  labs(title = "Productos diferentes comprados de viernes a domingo por Cluster",
+       x = "Cluster", 
+       y = "Productos diferentes comprados de viernes a domingo") +
+  scale_fill_manual("Cluster", values = paleta3) +
+  scale_y_continuous(breaks = seq(0, 75, 25))
+

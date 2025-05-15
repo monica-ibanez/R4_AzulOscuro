@@ -1,0 +1,26 @@
+{
+    "id": "6690BD80",
+    "path": "C:/Users/HP/OneDrive - Mondragon Unibertsitatea/EQUIPO_AZUL_OSCURO/RETO_4/Reto4 Azul Oscuro/Scripts/Clusterizacion.R",
+    "project_path": "Scripts/Clusterizacion.R",
+    "type": "r_source",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1746613367509.0,
+    "source_on_save": false,
+    "relative_order": 1,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "3,0",
+        "scrollLine": "0"
+    },
+    "folds": "3|23|6|0|\n6|8|8|0|\n10|21|13|0|\n13|8|15|0|\n17|19|20|0|\n20|8|22|0|\n24|23|27|0|\n27|8|29|0|\n31|24|34|0|\n34|8|36|0|\n38|22|41|0|\n41|8|43|0|\n45|23|48|0|\n48|8|50|0|\n52|23|55|0|\n55|8|57|0|\n59|16|288|0|\n60|30|63|0|\n64|83|110|0|\n111|25|232|0|\n112|85|158|2|\n159|32|174|2|\n208|25|210|2|\n211|27|213|4|\n214|29|216|6|\n217|31|219|8|\n220|33|222|10|\n233|40|248|0|\n249|67|287|0|\n289|27|291|0|\n292|29|299|0|\n300|30|302|0|\n303|10|307|0|\n308|26|321|0|\n322|28|365|0|\n366|13|382|37|\n383|28|385|102|\n386|25|389|0|\n390|24|450|0|\n",
+    "lastKnownWriteTime": 1747134506,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1747218454112,
+    "read_only": false,
+    "read_only_alternatives": []
+}
