@@ -108,7 +108,7 @@ rm(datos_clientes)
 ###################################################
 #Reduccion de dimensionalidad
 
-datos <- read.csv("Datos/Transformados/tickets_enc_Bien.csv")
+datos <- readRDS("Datos/Transformados/tickets_enc_Bien.rds")
 colnames(datos)
 sum(duplicated(tickets_enc))
 
@@ -256,4 +256,7 @@ test_data_brm<- getData(evaluationScheem_bmm, "known")
 
 
 set.seed(123)
-matriz_binaria <- as(matriz_real > 0, "dgCMatrix")  # si partimos de realRatingMatrix
+matriz_base <- as(matriz_rrm, "matrix")
+matriz_binaria <- as(matriz_base > 0, "dgCMatrix") # si partimos de realRatingMatrix
+
+saveRDS(matriz_binaria, "Datos/Transformados/matriz_binariaRsparse.RDS")
