@@ -13,6 +13,9 @@ if(!require(Isa)){
 if (!require(recommenderlab)){
   install.packages("recommenderlab")
 } #version 1.0.6
+if (!require(stringr)){
+  install.packages("stringr")
+}
 library(lubridate)
 library(dplyr)
 library(naniar)
@@ -20,6 +23,7 @@ library(tidyr)
 library(Matrix)
 library(recommenderlab)
 library(reshape2)
+library(stringr)
 
 #----------------------------------DATOS----------------------------------------
 #maetrostr<- readRDS("Datos/maestroestr.RDS")
@@ -37,6 +41,9 @@ str(tickets_enc)
 summary(tickets_enc)
 
 vis_miss(tickets_enc, `warn_large_data` = FALSE) # No se encuentran NA's
+
+productos = readRDS("Datos/maestroestr.RDS")
+str(productos)
 
 #------------------- TRATAMIENTO DE TICKETS DUPLICADOS ---------------------------
  #IDENTIFICACION DE TICKETS DUPLICADOS
@@ -89,6 +96,29 @@ tickets_enc <- tickets_enc %>%
 
 rm(df_dias_activos, df_compras_semanales, df_resultado)
 
+## PRODUCTOS POR CÓDIGO
+productos = productos %>% 
+  mutate(TIPO = str_sub(productos$cod_est, 1,2), .after = cod_est)  
+
+productos = productos %>%
+  mutate(TIPO = ifelse(TIPO == "01", "FRUTAS, VERDURAS Y OTROS PRODUCTOS VEGETALES", TIPO)) %>%
+  mutate(TIPO = ifelse(TIPO == "02", "CARNE", TIPO)) %>%
+  mutate(TIPO = ifelse(TIPO == "03", "CONGELADOS", TIPO)) %>%
+  mutate(TIPO = ifelse(TIPO == "04", "EMBUTIDOS", TIPO)) %>%
+  mutate(TIPO = ifelse(TIPO == "05", "LACTEOS", TIPO)) %>%
+  mutate(TIPO = ifelse(TIPO == "06", "PANADERÍA, BOLLERÍA Y REPOSTERÍA", TIPO)) %>%
+  mutate(TIPO = ifelse(TIPO == "07", "PESCADERÍA", TIPO)) %>%
+  mutate(TIPO = ifelse(TIPO == "14", "PRODUCTOS PRECOCINADOS", TIPO)) %>%
+  mutate(TIPO = ifelse(TIPO == "08", "ENLATADOS Y ENVASADOS", TIPO)) %>%
+  mutate(TIPO = ifelse(TIPO == "10", "DESAYUNOS", TIPO)) %>%
+  mutate(TIPO = ifelse(TIPO == "11", "BEBIDAS", TIPO)) %>%
+  mutate(TIPO = ifelse(TIPO == "09", "SALSAS, ESPECIAS, PASTA Y EMBOTADOS", TIPO)) %>%
+  mutate(TIPO = ifelse(TIPO == "12", "LIMPIEZA", TIPO)) %>%
+  mutate(TIPO = ifelse(TIPO == "13", "HIGIENE PERSONAL", TIPO))
+
+tickets_enc = left_join(tickets_enc, productos, by = "cod_est") %>% select(-descripcion)
+
+
 ## Crear df para clustering
 datos_clientes <- tickets_enc %>%
   group_by(id_cliente_enc) %>%
@@ -96,9 +126,20 @@ datos_clientes <- tickets_enc %>%
     total_productos = n(),  # Número total de compras (filas en la base de datos)
     productos_distintos = n_distinct(cod_est),  # Número de productos únicos comprados
     dias_activos = unique(dias_activos),
-    media_compras_por_semana = unique(media_compras_semana), # Evitar división por 0
-    compras_entre_semana = sum(dia_semana %in% 1:5),  # Compras de lunes a viernes
-    compras_fin_de_semana = sum(dia_semana %in% 6:7),   # Compras en sábado o domingo
+    vegetales = sum(TIPO == "FRUTAS, VERDURAS Y OTROS PRODUCTOS VEGETALES"),
+    carne = sum(TIPO == "CARNE"),
+    congelados = sum(TIPO == "CONGELADOS"),
+    embutido = sum(TIPO == "EMBUTIDOS"),
+    lacteos = sum(TIPO == "LACTEOS"),
+    gluten = sum(TIPO == "PANADERÍA, BOLLERÍA Y REPOSTERÍA"),
+    pescaderia = sum(TIPO == "PESCADERÍA"),
+    latas = sum(TIPO == "ENLATADOS Y ENVASADOS"),
+    sepe = sum(TIPO == "SALSAS, ESPECIAS, PASTA Y EMBOTADOS"),
+    desayuno = sum(TIPO == "DESAYUNOS"),
+    bebida = sum(TIPO == "BEBIDAS"),
+    limpieza = sum(TIPO == "LIMPIEZA"),
+    higiene = sum(TIPO == "HIGIENE PERSONAL"),
+    precocinados = sum(TIPO == "PRODUCTOS PRECOCINADOS")
     ) 
 
 write.csv(datos_clientes, "Datos/Transformados/datos_para_clustering.csv")
