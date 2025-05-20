@@ -1,3 +1,4 @@
+set.seed(777)
 library(lubridate)
 library(data.table)
 library(Matrix)
@@ -85,8 +86,89 @@ print(resultado_final)
 
 
 # Resumen final
-cat("\n✅ Recomendación completada con ALS para producto:", producto_objetivo, "-", descripcion_producto, "\n")
-cat("🛒 Ya habían comprado el producto:", sum(resultado_final$Compras_Previas > 0), "clientes\n")
-cat("📈 Afinidad media:", round(mean(resultado_final$Afinidad_Predicha), 3), "\n")
+cat("Recomendación completada con ALS para producto:", producto_objetivo, "-", descripcion_producto, "\n")
+cat("Ya habían comprado el producto:", sum(resultado_final$Compras_Previas > 0), "clientes\n")
+cat("Afinidad media:", round(mean(resultado_final$Afinidad_Predicha), 3), "\n")
 
+
+
+
+set.seed(777)
+library(lubridate)
+library(data.table)
+library(Matrix)
+library(rsparse)
+
+# Leer archivos necesarios
+objetivos <- readRDS("Datos/objetivos.RDS")
+maestroestr <- readRDS("Datos/maestroestr.RDS")
+tickets <- readRDS("Datos/tickets_enc.RDS")  # Solo necesario para compras previas
+matriz_binaria <- readRDS("Datos/Transformados/matriz_binariaRsparse.RDS")
+
+# Convertir a data.table
+setDT(maestroestr)
+setDT(tickets)
+
+# Extraer producto objetivo
+producto_objetivo <- objetivos$objetivo1$obj
+
+
+# Obtener descripción del producto
+descripcion_producto <- maestroestr[cod_est == producto_objetivo, descripcion]
+if (length(descripcion_producto) == 0) descripcion_producto <- "Descripción no disponible"
+cat("Recomendando:", producto_objetivo, "-", descripcion_producto, "\n")
+
+# Extraer nombres de clientes y productos desde la matriz binaria
+clientes <- data.table(cliente_idx = 1:nrow(matriz_binaria),
+                       id_cliente_enc = rownames(matriz_binaria))
+productos <- data.table(producto_idx = 1:ncol(matriz_binaria),
+                        cod_est = colnames(matriz_binaria))
+
+# Paso 2: Entrenar modelo ALS
+modelo <- WRMF$new(rank = 20, lambda = 0.1, max_iter = 10, nthread = parallel::detectCores() - 1)
+factores_usuario <- modelo$fit_transform(matriz_binaria)
+factores_item <- modelo$components
+
+# Paso 3: Calcular afinidad al producto objetivo
+idx_producto <- productos[cod_est == producto_objetivo, producto_idx]
+puntuaciones <- as.matrix(factores_usuario %*% factores_item)
+afinidades <- puntuaciones[, idx_producto]
+
+# Paso 4: Crear tabla de resultados
+res <- data.table(cliente_idx = 1:length(afinidades), afinidad = afinidades)
+res <- merge(res, clientes, by = "cliente_idx")
+
+# Top 10 clientes con mayor afinidad
+top10 <- res[order(-afinidad)][1:10]
+
+# Paso 5: Verificar compras previas y actividad total
+compras_previas <- tickets[
+  id_cliente_enc %in% top10$id_cliente_enc & cod_est == producto_objetivo,
+  .N, by = id_cliente_enc
+]
+setnames(compras_previas, "N", "Compras_Previas")
+
+actividad <- tickets[
+  id_cliente_enc %in% top10$id_cliente_enc,
+  .N, by = id_cliente_enc
+]
+setnames(actividad, "N", "Total_Compras")
+
+# Unir datos
+top10 <- merge(top10, compras_previas, by = "id_cliente_enc", all.x = TRUE)
+top10 <- merge(top10, actividad, by = "id_cliente_enc", all.x = TRUE)
+top10[is.na(Compras_Previas), Compras_Previas := 0]
+top10[is.na(Total_Compras), Total_Compras := 0]
+top10[, Ranking := rank(-afinidad, ties.method = "first")]
+
+# Organizar columnas
+resultado_final <- top10[, .(Ranking, id_cliente_enc, Afinidad_Predicha = afinidad,
+                             Compras_Previas, Total_Compras)]
+setorder(resultado_final, Ranking)
+print(resultado_final)
+
+# Resumen final
+cat("Recomendación completada con ALS para producto:", producto_objetivo, "-", descripcion_producto, "\n")
+cat("Ya habían comprado el producto:", sum(resultado_final$Compras_Previas > 0), "clientes\n")
+cat("Afinidad media:", round(mean(resultado_final$Afinidad_Predicha), 3), "\n")
 
