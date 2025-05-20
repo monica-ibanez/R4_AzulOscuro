@@ -105,8 +105,7 @@ write.csv(datos_clientes, "Datos/Transformados/datos_para_clustering.csv")
 rm(datos_clientes)
 
 
-###################################################
-#Reduccion de dimensionalidad
+#------------------------- REDUCCION DE DIMENSIONALIDAD -----------------------------
 
 datos <- readRDS("Datos/Transformados/tickets_enc_Bien.rds")
 colnames(datos)
@@ -192,11 +191,14 @@ compras_reducido <- datos %>%
   filter(id_cliente_enc %in% clientes_filtrados_final,
          cod_est %in% productos_filtrados_final)
 
+rm(cliente_stats ,umbral_inferior, umbral_superior, clientes_mas_compras, umbral_diversidad_baja,
+   clientes_diversidad, productos_frecuencia, umbral_productos, umbral_productosa,
+   productos_filtrado, producto_stats, umbral_productos2, umbral_productos3, productos, productos_filtrados, 
+   compras_reducido, objetivos, clientes_protegidos, clientes_filtrados_final, productos_protegidos, productos_filtrados_final)
 
-#########################################
-#####Creación de la matríz
+#------------------------- CREACION DE LA MATRIZ -----------------------------
 
-# 1. Cargar librerías necesarias
+# adaptamos los datos para crear la matriz
 set.seed(123)    
 matriz_clientes_productos <- compras_reducido %>%
   group_by(id_cliente_enc, cod_est) %>%
@@ -209,41 +211,40 @@ matriz_clientes_productos <- compras_reducido %>%
   summarise(Frecuencia = n(), .groups = 'drop') %>%
   pivot_wider(names_from = cod_est, values_from = Frecuencia, values_fill = list(Frecuencia = 0))
 
-# Paso 2: Convertir la matriz a la clase 'realRatingMatrix'
-# Convertir a matriz
+# Convertir la matriz a la clase 'realRatingMatrix'
 matriz_clientes_productos_matrix <- as.matrix(matriz_clientes_productos[, -1])  # Eliminar la columna id_cliente_enc
 rownames(matriz_clientes_productos_matrix) <- matriz_clientes_productos$id_cliente_enc
 
-# Convertir la matriz a tipo 'realRatingMatrix' de recommenderlab
 matriz_rrm <- as(matriz_clientes_productos_matrix, "realRatingMatrix")
 
-# Verificar la estructura
 matriz_rrm
 saveRDS(matriz_rrm, "Datos/Transformados/matriz_rrm.RDS")
 
-# Paso 3: Convertir la matriz a la clase 'sparseMatrix'
-# Convertir a matriz
+#Convertir la matriz a la clase 'sparseMatrix'
 matriz_clientes_productos_matrix <- as.matrix(matriz_clientes_productos[, -1])  # Eliminar la columna id_cliente_enc
 rownames(matriz_clientes_productos_matrix) <- matriz_clientes_productos$id_cliente_enc
 
-# Convertir la matriz a tipo 'sparseMatrix' de rsparse
 matriz_sm <- as(matriz_clientes_productos_matrix, "sparseMatrix")
 
-# Verificar la estructura
 matriz_sm
 saveRDS(matriz_sm, "Datos/Transformados/matriz_sm.RDS")
 
-# Paso 4: Convertir la matriz a la clase 'binaryRatingMatrix'
-# Convertir a matriz
+#Convertir la matriz a la clase 'binaryRatingMatrix'
 matriz_clientes_productos_matrix <- as.matrix(matriz_clientes_productos[, -1])  # Eliminar la columna id_cliente_enc
 rownames(matriz_clientes_productos_matrix) <- matriz_clientes_productos$id_cliente_enc
 
-# Convertir la matriz a tipo 'realRatingMatrix' de recommenderlab
 matriz_brm <- as(matriz_clientes_productos_matrix, "binaryRatingMatrix")
 
-# Verificar la estructura
 matriz_brm
 saveRDS(matriz_brm, "Datos/Transformados/matriz_brm.RDS")
+
+##Convertir la matriz a la clase binaria de Rsparse
+matriz_base <- as(matriz_rrm, "matrix")
+matriz_binaria <- as(matriz_base > 0, "dgCMatrix") # si partimos de realRatingMatrix
+
+saveRDS(matriz_binaria, "Datos/Transformados/matriz_binariaRsparse.RDS")
+
+
 # dividir matrices
 set.seed(123)
 evaluationScheem_rmm<-evaluationScheme(matriz_rrm, method = "split", train = 0.8, given = 3, goodRating = 1)
@@ -255,8 +256,3 @@ train_data_brm<- getData(evaluationScheem_bmm, "train")
 test_data_brm<- getData(evaluationScheem_bmm, "known")
 
 
-set.seed(123)
-matriz_base <- as(matriz_rrm, "matrix")
-matriz_binaria <- as(matriz_base > 0, "dgCMatrix") # si partimos de realRatingMatrix
-
-saveRDS(matriz_binaria, "Datos/Transformados/matriz_binariaRsparse.RDS")
