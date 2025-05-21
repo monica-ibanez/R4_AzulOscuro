@@ -8,12 +8,22 @@ Productos<-readRDS("Datos/maestroestr.RDS")
 #Segundo objetivo
 objetivos<-objetivos[[3]]
 
-matriz_usuarios<-sparsematrix[,objetivos$obj] #Matriz filtrada
-dim(matriz_usuarios)
+matriz_items<-sparsematrix[,objetivos$obj] #Matriz filtrada
+
 matriz <- as(sparsematrix, "dgCMatrix")
-ma
+
 modelo <- WRMF$new(rank = 10, lambda = 0.1,dynamic_lambda = TRUE, feedback = "implicit" )
-set.seed(123)
+set.seed(1)
+
 user_emb <- modelo$fit_transform(matriz)
 item_emb <- modelo$components
-predicciones<-modelo$predict(matriz_usuarios, k = 1 )
+predicciones <- modelo$predict(matriz_items,not_recommend = sparsematrix, k = 1)
+
+valoraciones<-attr(predicciones,"scores")
+
+productos_recomendados<- as.data.frame(attr(predicciones,"ids"))
+
+colnames(productos_recomendados)<-"cod_est"
+df_final<-inner_join(productos_recomendados,Productos,  by = "cod_est")
+
+unique(df_final$descripcion)

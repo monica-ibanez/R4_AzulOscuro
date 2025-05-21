@@ -12,11 +12,11 @@ matriz_usuarios<-sparsematrix[objetivos$obj,] #Matriz filtrada
 dim(matriz_usuarios)
 matriz <- as(sparsematrix, "dgCMatrix")
 # Paso 2: Entrenar modelo ALS
-set.seed(123)
-modelo <- WRMF$new(rank = 50, lambda = 0.1, max_iter = 10, nthread = parallel::detectCores() - 1)
+modelo <- WRMF$new(rank = 10, lambda = 0.1,feedback = "implicit", dynamic_lambda =  T)
+set.seed(1)
 user_emb <- modelo$fit_transform(matriz)
 item_emb <- modelo$components
-predicciones<-modelo$predict(matriz_usuarios, k = 1, not_recommend =  )
+predicciones<-modelo$predict(matriz_usuarios, k = 1, feedback = "implicit")
 
 valoraciones<-attr(predicciones,"scores")
 
