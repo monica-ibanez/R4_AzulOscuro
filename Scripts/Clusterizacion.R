@@ -56,6 +56,13 @@ if (!require(stringr)){
 } else {
   library(stringr)
 }
+#TIDYVERSE
+if (!require(tidyverse)){
+  install.packages("tidyverse")
+  library(tidyverse)
+} else {
+  library(tidyverse)
+}
 
 ##### FUNCIONES ################################################################
 select_var_num = function(df){
@@ -406,7 +413,6 @@ df_names = colnames(df_cluster)
 df_num = select_var_num(df_cluster)
 df_cha = df_cluster %>% select(-all_of(colnames(df_num)))
 
-paleta = c("#E6001F", "#CC001C", "#FF3347", "#B30019", "#990015" ,"#005FAA", "#004C88")
 paleta3 = c("#FF3347", "#FFFFFF", "#005FAA")
 
 #TOTAL DE PRODUCTOS COMPRADOS
@@ -438,118 +444,151 @@ dias_activos_media = (ggplot(damedia, aes(x = Cluster, y = media, fill = Cluster
   scale_fill_manual("Cluster", values = paleta3) +
   scale_y_continuous(breaks = seq(0,3,1)))
 
-#CARNE
-carne = (ggplot(df_cluster, aes(x = Cluster, y = carne, fill = Cluster)) +
-  geom_boxplot() +
-  labs(title = "Carne comprada por Cluster",
-       x = "Cluster", 
-       y = "Productos cárnicos") +
-  scale_fill_manual("Cluster", values = paleta3))
+# #CARNE
+# carne = (ggplot(df_cluster, aes(x = Cluster, y = carne, fill = Cluster)) +
+#   geom_boxplot() +
+#   labs(title = "Carne comprada por Cluster",
+#        x = "Cluster", 
+#        y = "Productos cárnicos") +
+#   scale_fill_manual("Cluster", values = paleta3))
+# 
+# #PRODUCTOS DE ORIGEN VEGETAL
+# vegetal = (ggplot(df_cluster, aes(x = Cluster, y = vegetales, fill = Cluster)) +
+#   geom_boxplot() +
+#   labs(title = "Productos de origen vegetal comprados por Cluster",
+#        x = "Cluster", 
+#        y = "Productos de origen vegetal") +
+#   scale_fill_manual("Cluster", values = paleta3))
+# 
+# #CONGELADOS
+# congelados = (ggplot(df_cluster, aes(x = Cluster, y = congelados, fill = Cluster)) +
+#   geom_boxplot() +
+#   labs(title = "Productos congelado comprados por Cluster",
+#        x = "Cluster", 
+#        y = "Productos congelados") +
+#   scale_fill_manual("Cluster", values = paleta3))
+# 
+# #LACTEOS
+# lacteos = (ggplot(df_cluster, aes(x = Cluster, y = lacteos, fill = Cluster)) +
+#   geom_boxplot() +
+#   labs(title = "Productos lacteos comprados por Cluster",
+#        x = "Cluster", 
+#        y = "Lacteos") +
+#   scale_fill_manual("Cluster", values = paleta3))
+# 
+# #EMBUTIDO
+# embutido = (ggplot(df_cluster, aes(x = Cluster, y = embutido, fill = Cluster)) +
+#   geom_boxplot() +
+#   labs(title = "Embutido comprado por Cluster",
+#        x = "Cluster", 
+#        y = "Embutido") +
+#   scale_fill_manual("Cluster", values = paleta3))
+# 
+# #GLUTEN
+# gluten = (ggplot(df_cluster, aes(x = Cluster, y = gluten, fill = Cluster)) +
+#   geom_boxplot() +
+#   labs(title = "Productos de panadería comprados por Cluster",
+#        x = "Cluster", 
+#        y = "Panadería y bollería") +
+#   scale_fill_manual("Cluster", values = paleta3))
+# 
+# #PESCADERÍA
+# pescaderia = (ggplot(df_cluster, aes(x = Cluster, y = pescaderia, fill = Cluster)) +
+#   geom_boxplot() +
+#   labs(title = "Productos de pescadería comprados por Cluster",
+#        x = "Cluster", 
+#        y = "Productos de pescadería") +
+#   scale_fill_manual("Cluster", values = paleta3))
+# 
+# #LATAS
+# latas = (ggplot(df_cluster, aes(x = Cluster, y = latas, fill = Cluster)) +
+#                 geom_boxplot() +
+#                 labs(title = "Productos enlatados comprados por Cluster",
+#                      x = "Cluster", 
+#                      y = "Productos enlatados") +
+#                 scale_fill_manual("Cluster", values = paleta3))
+# 
+# #SEPE
+# sepe = (ggplot(df_cluster, aes(x = Cluster, y = sepe, fill = Cluster)) +
+#           geom_boxplot() +
+#           labs(title = "Salsas, especias, pasta y productos embotados comprados por Cluster",
+#                x = "Cluster", 
+#                y = "Salsas, especias, pasta y productos embotados") +
+#           scale_fill_manual("Cluster", values = paleta3))
+# 
+# #DESAYUNO
+# desayuno = (ggplot(df_cluster, aes(x = Cluster, y = desayuno, fill = Cluster)) +
+#               geom_boxplot() +
+#               labs(title = "Cereales, tostadas y galletas compradas por Cluster",
+#                    x = "Cluster", 
+#                    y = "Cereales, tostadas y galletas") +
+#               scale_fill_manual("Cluster", values = paleta3))
+# 
+# #BEBIDA
+# bebida = (ggplot(df_cluster, aes(x = Cluster, y = bebida, fill = Cluster)) +
+#             geom_boxplot() +
+#             labs(title = "Bebidas compradas por Cluster",
+#                  x = "Cluster", 
+#                  y = "Bebidas") +
+#             scale_fill_manual("Cluster", values = paleta3))
+# 
+# #LIMPIEZA
+# limpieza = (ggplot(df_cluster, aes(x = Cluster, y = limpieza, fill = Cluster)) +
+#               geom_boxplot() +
+#               labs(title = "Productos de limpieza comprados por Cluster",
+#                    x = "Cluster", 
+#                    y = "Productos de limpieza") +
+#               scale_fill_manual("Cluster", values = paleta3))
+# 
+# #HIGIENE
+# higiene = (ggplot(df_cluster, aes(x = Cluster, y = higiene, fill = Cluster)) +
+#              geom_boxplot() +
+#              labs(title = "Productos de higiene comprados por Cluster",
+#                   x = "Cluster", 
+#                   y = "Productos de higiene") +
+#              scale_fill_manual("Cluster", values = paleta3))
+# 
+# #PRECOCINADOS
+# precocinados = (ggplot(df_cluster, aes(x = Cluster, y = precocinados, fill = Cluster)) +
+#                   geom_boxplot() +
+#                   labs(title = "Productos precocinados comprados por Cluster",
+#                        x = "Cluster", 
+#                        y = "Productos precocinados") +
+#                   scale_fill_manual("Cluster", values = paleta3))
 
-#PRODUCTOS DE ORIGEN VEGETAL
-vegetal = (ggplot(df_cluster, aes(x = Cluster, y = vegetales, fill = Cluster)) +
-  geom_boxplot() +
-  labs(title = "Productos de origen vegetal comprados por Cluster",
-       x = "Cluster", 
-       y = "Productos de origen vegetal") +
-  scale_fill_manual("Cluster", values = paleta3))
+clientes_productos = df_cluster[,-(1:4)] 
+pie_chart = as.data.frame(t(rbind((clientes_productos %>% filter(Cluster == 1) %>% select(-Cluster) %>% colMeans()),
+      (clientes_productos %>% filter(Cluster == 2) %>% select(-Cluster) %>% colMeans()),
+      (clientes_productos %>% filter(Cluster == 3) %>% select(-Cluster) %>% colMeans()))))
+colnames(pie_chart) = c("Clúster 1", "Clúster 2", "Clúster 3")
+pie_chart = cbind(pie_chart, TOT = rowSums(pie_chart))
 
-#CONGELADOS
-congelados = (ggplot(df_cluster, aes(x = Cluster, y = congelados, fill = Cluster)) +
-  geom_boxplot() +
-  labs(title = "Productos congelado comprados por Cluster",
-       x = "Cluster", 
-       y = "Productos congelados") +
-  scale_fill_manual("Cluster", values = paleta3))
+pie_chart = cbind(RN = rownames(pie_chart), pie_chart)
+pie_chart$RN = c("Vegetales", 
+                 "Carne", 
+                 "Congelados", 
+                 "Embutido", 
+                 "Lácteos", 
+                 "Panadería", 
+                 "Pescadería",
+                 "Latas", 
+                 "S.E.P.E.",
+                 "Desayunos",
+                 "Bebida",
+                 "Limpieza",
+                 "Higiene",
+                 "Precocinados")
 
-#LACTEOS
-lacteos = (ggplot(df_cluster, aes(x = Cluster, y = lacteos, fill = Cluster)) +
-  geom_boxplot() +
-  labs(title = "Productos lacteos comprados por Cluster",
-       x = "Cluster", 
-       y = "Lacteos") +
-  scale_fill_manual("Cluster", values = paleta3))
+norm_prod = pie_chart %>%
+pivot_longer(!RN, names_to = "cluster", values_to = "valor")
 
-#EMBUTIDO
-embutido = (ggplot(df_cluster, aes(x = Cluster, y = embutido, fill = Cluster)) +
-  geom_boxplot() +
-  labs(title = "Embutido comprado por Cluster",
-       x = "Cluster", 
-       y = "Embutido") +
-  scale_fill_manual("Cluster", values = paleta3))
-
-#GLUTEN
-gluten = (ggplot(df_cluster, aes(x = Cluster, y = gluten, fill = Cluster)) +
-  geom_boxplot() +
-  labs(title = "Productos de panadería comprados por Cluster",
-       x = "Cluster", 
-       y = "Panadería y bollería") +
-  scale_fill_manual("Cluster", values = paleta3))
-
-#PESCADERÍA
-pescaderia = (ggplot(df_cluster, aes(x = Cluster, y = pescaderia, fill = Cluster)) +
-  geom_boxplot() +
-  labs(title = "Productos de pescadería comprados por Cluster",
-       x = "Cluster", 
-       y = "Productos de pescadería") +
-  scale_fill_manual("Cluster", values = paleta3))
-
-#LATAS
-latas = (ggplot(df_cluster, aes(x = Cluster, y = latas, fill = Cluster)) +
-                geom_boxplot() +
-                labs(title = "Productos enlatados comprados por Cluster",
-                     x = "Cluster", 
-                     y = "Productos enlatados") +
-                scale_fill_manual("Cluster", values = paleta3))
-
-#SEPE
-sepe = (ggplot(df_cluster, aes(x = Cluster, y = sepe, fill = Cluster)) +
-          geom_boxplot() +
-          labs(title = "Salsas, especias, pasta y productos embotados comprados por Cluster",
-               x = "Cluster", 
-               y = "Salsas, especias, pasta y productos embotados") +
-          scale_fill_manual("Cluster", values = paleta3))
-
-#DESAYUNO
-desayuno = (ggplot(df_cluster, aes(x = Cluster, y = desayuno, fill = Cluster)) +
-              geom_boxplot() +
-              labs(title = "Cereales, tostadas y galletas compradas por Cluster",
-                   x = "Cluster", 
-                   y = "Cereales, tostadas y galletas") +
-              scale_fill_manual("Cluster", values = paleta3))
-
-#BEBIDA
-bebida = (ggplot(df_cluster, aes(x = Cluster, y = bebida, fill = Cluster)) +
-            geom_boxplot() +
-            labs(title = "Bebidas compradas por Cluster",
-                 x = "Cluster", 
-                 y = "Bebidas") +
-            scale_fill_manual("Cluster", values = paleta3))
-
-#LIMPIEZA
-limpieza = (ggplot(df_cluster, aes(x = Cluster, y = limpieza, fill = Cluster)) +
-              geom_boxplot() +
-              labs(title = "Productos de limpieza comprados por Cluster",
-                   x = "Cluster", 
-                   y = "Productos de limpieza") +
-              scale_fill_manual("Cluster", values = paleta3))
-
-#HIGIENE
-higiene = (ggplot(df_cluster, aes(x = Cluster, y = higiene, fill = Cluster)) +
-             geom_boxplot() +
-             labs(title = "Productos de higiene comprados por Cluster",
-                  x = "Cluster", 
-                  y = "Productos de higiene") +
-             scale_fill_manual("Cluster", values = paleta3))
-
-#PRECOCINADOS
-precocinados = (ggplot(df_cluster, aes(x = Cluster, y = precocinados, fill = Cluster)) +
-                  geom_boxplot() +
-                  labs(title = "Productos precocinados comprados por Cluster",
-                       x = "Cluster", 
-                       y = "Productos precocinados") +
-                  scale_fill_manual("Cluster", values = paleta3))
-
-
-
+ggplot(filter(norm_prod, cluster != "TOT"), aes(x = RN, y = valor, fill = cluster)) +
+  geom_col(position = "dodge", color = "black") +
+  scale_fill_manual("Cluster", values = paleta3) +
+  theme(axis.text.x = element_text(angle = 45)) +
+  labs(title = "Productos comprados por Cluster",
+       x = "Productos",
+       y = "")
+  
+  
 
