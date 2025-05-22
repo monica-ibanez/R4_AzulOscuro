@@ -30,15 +30,15 @@ if (!require(dplyr)){
 #* @apiDescription Esta Interfaz de Programación de Aplicaciones tiene como objetivo recomendar productos a clientes de Eroski
 
 #* @serializer json
-#* @param id_usuario
-#* @param recomendaciones
+#* @param id_usuario:character ID
+#* @param recomendaciones:numeric recomendaciones
 #* @post Recomendaciones
 
 x <- function(id_usuario = as.character("004c726a1f31128ad5b9f70b9f6f000d"), recomendaciones = 1) {
   
   matriz <- readRDS("C:/Users/aritz/OneDrive - Mondragon Unibertsitatea/Escritorio/BDATA1/Github/Datos/Transformados/matriz_binariaRsparse.RDS")
   matriz <- as(matriz, "dgCMatrix")
-  
+  a
   set.seed(1)
   modelo <- WRMF$new(rank = 10, lambda = 0.1, feedback = "implicit", dynamic_lambda = TRUE)
   user_emb <- modelo$fit_transform(matriz)
