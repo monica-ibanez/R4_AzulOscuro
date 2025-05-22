@@ -256,3 +256,4 @@ train_data_brm<- getData(evaluationScheem_bmm, "train")
 test_data_brm<- getData(evaluationScheem_bmm, "known")
 
 
+
