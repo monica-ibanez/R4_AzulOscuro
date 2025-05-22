@@ -10,7 +10,7 @@ library(RColorBrewer)
 
 # PALETAS DE COLORES
 eroski_colores <- c("#E6001F", "#CC001C", "#FF3347", "#B30019", "#990015", "#005FAA", "#004C88")
-paleta3 <- c("#FF3347", "#FFFFFF", "#005FAA")
+paleta3 <- c("#FF3347", "#990015", "#005FAA")
 
 # DATOS
 df_ticket <- readRDS("Datos/Transformados/tickets_enc_Bien.rds")
@@ -73,8 +73,13 @@ ui <- navbarPage(
              sidebarPanel(
                h4("Resumen de datos"),
                verbatimTextOutput("info_general"),
-               selectInput("cliente_select", "Selecciona cliente:", choices = NULL),
-               verbatimTextOutput("cliente_resumen"),
+               hr(),
+               h4("Selecciona cliente:"),
+               selectizeInput("cliente_select", label = NULL, 
+                              choices = NULL, options = list(placeholder = 'Escribe para buscar...')),
+               uiOutput("cliente_info_ui"),
+               hr(),
+               h4("NULL", style = "color: #666; font-style: italic;"),
                conditionalPanel("input.subtab == 'productos'",
                                 sliderInput("n_productos", "Número de productos a mostrar:", 5, 30, 10)),
                conditionalPanel("input.subtab == 'producto_mes'",
@@ -82,22 +87,29 @@ ui <- navbarPage(
              ),
              mainPanel(
                tabsetPanel(id = "subtab",
-                           tabPanel("Productos más vendidos", value = "productos", DTOutput("tabla_productos")),
-                           tabPanel("Ventas por mes", value = "mes", plotlyOutput("grafico_mes")),
-                           tabPanel("Día de la semana", value = "dia", plotOutput("plot_dia")),
-                           tabPanel("Producto por mes", value = "producto_mes", plotOutput("plot_producto_mes")),
-                           
+                           tabPanel("Productos más vendidos", value = "productos", 
+                                    DTOutput("tabla_productos") %>% withSpinner()),
+                           tabPanel("Ventas por mes", value = "mes", 
+                                    plotlyOutput("grafico_mes") %>% withSpinner()),
+                           tabPanel("Día de la semana", value = "dia", 
+                                    plotOutput("plot_dia") %>% withSpinner()),
+                           tabPanel("Producto por mes", value = "producto_mes", 
+                                    plotOutput("plot_producto_mes") %>% withSpinner()),
                            tabPanel("Historial de entradas", value = "historial",
                                     fluidRow(
                                       column(6,
-                                             selectInput("cliente_historial", "Selecciona un cliente:", choices = NULL),
-                                             textOutput("info_cliente_historial"),
-                                             actionButton("guardar_entrada", "Guardar entrada"),
-                                             actionButton("borrar_historial", "Borrar historial"),
-                                             downloadButton("descargar_historial", "⬇️ Descargar historial")
+                                             h4("Resumen del cliente seleccionado"),
+                                             verbatimTextOutput("info_cliente_historial"),
+                                             actionButton("guardar_entrada", "Guardar entrada", 
+                                                          icon = icon("save"),
+                                                          style = "background-color: #005FAA; color: white;"),
+                                             actionButton("borrar_historial", "Borrar historial",
+                                                          icon = icon("trash")),
+                                             downloadButton("descargar_historial", "Descargar historial",
+                                                            style = "background-color: #E6001F; color: white;")
                                       ),
                                       column(6,
-                                             DT::dataTableOutput("tabla_historial")
+                                             DTOutput("tabla_historial") %>% withSpinner()
                                       )
                                     )
                            )
@@ -112,13 +124,13 @@ ui <- navbarPage(
              tabsetPanel(
                tabPanel("Variables numéricas",
                         fluidRow(
-                          column(6, plotOutput("plot_semana")),
-                          column(6, plotOutput("plot_findesemana"))
+                          column(6, plotOutput("plot_semana") %>% withSpinner()),
+                          column(6, plotOutput("plot_findesemana") %>% withSpinner())
                         ),
                         br(),
                         fluidRow(
-                          column(6, plotOutput("plot_total")),
-                          column(6, plotOutput("plot_variedad"))
+                          column(6, plotOutput("plot_total") %>% withSpinner()),
+                          column(6, plotOutput("plot_variedad") %>% withSpinner())
                         )
                ),
                tabPanel("Categorías clave",
@@ -131,7 +143,7 @@ ui <- navbarPage(
                           ),
                           mainPanel(
                             tabsetPanel(
-                              tabPanel("Gráfico", plotlyOutput("box_categoria")),
+                              tabPanel("Gráfico", plotlyOutput("box_categoria") %>% withSpinner()),
                               tabPanel("Resumen", tableOutput("media_categoria"))
                             )
                           )
@@ -142,7 +154,7 @@ ui <- navbarPage(
                         tableOutput("resumen_clusters"),
                         br(),
                         h4("Visualización gráfica"),
-                        plotlyOutput("grafico_resumen_clusters")
+                        plotlyOutput("grafico_resumen_clusters") %>% withSpinner()
                )
              )
            )
@@ -159,30 +171,61 @@ ui <- navbarPage(
 # SERVER
 server <- function(input, output, session) {
   
+  # Resumen de clusters
   output$resumen_clusters <- renderTable({
     df_cluster %>%
       group_by(Cluster) %>%
       summarise(across(where(is.numeric), ~round(mean(.x, na.rm = TRUE), 2)), .groups = "drop")
   })
   
+  # Info general
   output$info_general <- renderPrint({
     cat("Total de tickets:", nrow(df), "\n")
     cat("Clientes distintos:", n_distinct(df$id_cliente_enc))
   })
   
+  # Actualizar selección de clientes
   observe({
-    updateSelectInput(session, "cliente_select", choices = sort(unique(df$id_cliente_enc)))
+    clientes <- sort(unique(df$id_cliente_enc))
+    updateSelectizeInput(session, "cliente_select", choices = clientes, server = TRUE)
+    updateSelectInput(session, "cliente_historial", choices = clientes)
     updateSelectInput(session, "producto_seleccionado", choices = sort(unique(df$descripcion)))
   })
   
-  output$cliente_resumen <- renderPrint({
+  # Info del cliente en formato UI mejorado
+  output$cliente_info_ui <- renderUI({
     req(input$cliente_select)
     cliente_df <- df %>% filter(id_cliente_enc == input$cliente_select)
-    top_prod <- cliente_df %>% count(descripcion, sort = TRUE) %>% slice_head(n = 3)
-    cat("Productos más comprados por el cliente:\n")
-    apply(top_prod, 1, function(row) cat("- ", row[1], "(", row[2], " veces)\n"))
+    top_prod <- cliente_df %>% 
+      count(descripcion, sort = TRUE) %>% 
+      slice_head(n = 3)
+    
+    if(nrow(top_prod) == 0) {
+      return(tags$p("No hay datos de compras para este cliente."))
+    }
+    
+    tags$div(
+      style = "background-color: #F7F7F7; padding: 10px; border-radius: 5px;",
+      h5("Productos más conocidos por el cliente:", style = "color: #005FAA;"),
+      tags$ul(
+        style = "margin-left: 20px;",
+        lapply(1:nrow(top_prod), function(i) {
+          tags$li(paste0(top_prod$descripcion[i], " (", top_prod$n[i], " veces)"))
+        })
+      )
+    )
   })
   
+  # Sincronizar selección de cliente entre pestañas
+  observeEvent(input$cliente_select, {
+    updateSelectInput(session, "cliente_historial", selected = input$cliente_select)
+  })
+  
+  observeEvent(input$cliente_historial, {
+    updateSelectizeInput(session, "cliente_select", selected = input$cliente_historial)
+  })
+  
+  # Tabla de productos más vendidos
   output$tabla_productos <- renderDT({
     top_n <- input$n_productos
     productos_top <- df %>%
@@ -193,6 +236,7 @@ server <- function(input, output, session) {
     datatable(productos_top, options = list(pageLength = top_n), rownames = FALSE)
   })
   
+  # Gráfico de ventas por mes
   output$grafico_mes <- renderPlotly({
     colores_usados <- rep(eroski_colores, length.out = nrow(ventas_por_mes))
     plot_ly(
@@ -209,6 +253,7 @@ server <- function(input, output, session) {
       layout(title = "Total de productos por mes", showlegend = TRUE)
   })
   
+  # Gráfico de ventas por día de la semana
   output$plot_dia <- renderPlot({
     ggplot(ventas_por_dia, aes(x = dia_semana, y = cantidad)) +
       geom_col(fill = eroski_colores[2]) +
@@ -216,6 +261,7 @@ server <- function(input, output, session) {
       theme_minimal()
   })
   
+  # Gráfico de producto por mes
   output$plot_producto_mes <- renderPlot({
     req(input$producto_seleccionado)
     datos <- df %>%
@@ -229,7 +275,8 @@ server <- function(input, output, session) {
            x = "Mes", y = "Cantidad") +
       theme_minimal()
   })
-  # Inicializar historial
+  
+  # Historial de entradas
   historial <- reactiveVal(data.frame(
     Timestamp = numeric(),
     ID_Cliente = character(),
@@ -239,12 +286,7 @@ server <- function(input, output, session) {
     stringsAsFactors = FALSE
   ))
   
-  # Poblar clientes al iniciar
-  observe({
-    updateSelectInput(session, "cliente_historial", choices = sort(unique(df$id_cliente_enc)))
-  })
-  
-  # Mostrar resumen del cliente
+  # Info del cliente para el historial
   output$info_cliente_historial <- renderText({
     req(input$cliente_historial)
     datos <- df %>% filter(id_cliente_enc == input$cliente_historial)
@@ -295,7 +337,7 @@ server <- function(input, output, session) {
     }
   )
   
-  
+  # Gráficos de clusters
   output$plot_semana <- renderPlot({
     ggplot(df_cluster, aes(x = Cluster, y = compras_entre_semana, fill = Cluster)) +
       geom_boxplot() +
@@ -347,7 +389,7 @@ server <- function(input, output, session) {
   output$modelo_placeholder <- renderPrint({
     cat("Aquí irán los resultados del modelo de predicción o clasificación.")
   })
-    
+  
   output$grafico_resumen_clusters <- renderPlotly({
     resumen <- df_cluster %>%
       group_by(Cluster) %>%
@@ -375,7 +417,6 @@ server <- function(input, output, session) {
              xaxis = list(title = ""),
              yaxis = list(title = "Media"))
   })
-  
 }
 
 # EJECUTAR
@@ -397,69 +438,4 @@ shinyApp(ui = ui, server = server)
 
 
 
-
-##
-select_var_num = function(df){
-  df_num = df %>% select(where(is.numeric))
-  return(df_num)
-}
-df_cluster$Cluster<- as.factor(df_cluster$Cluster)
-df_cluster<- df_cluster[,-1]
-df_names = colnames(df_cluster)
-df_num = select_var_num(df_cluster)
-df_cha = df_cluster %>% select(-all_of(colnames(df_num)))
-str(df_cluster)
-
-
-paleta = c("#E6001F", "#CC001C", "#FF3347", "#B30019", "#990015" ,"#005FAA", "#004C88")
-paleta3 = c("#FF3347", "#FFFFFF", "#005FAA")
-
-ggplot(df_cluster, aes(x = Cluster, y = total_productos, fill = Cluster)) +
-  geom_boxplot() +
-  labs(title = "Total de productos comprados por Cluster",
-       x = "Cluster", 
-       y = "Total de productos comprados") +
-  scale_fill_manual("Cluster", values = paleta3) +
-  scale_y_continuous(breaks = seq(0,325, 25))
-
-ggplot(df_cluster, aes(x = Cluster, y = productos_distintos, fill = Cluster)) +
-  geom_violin() +
-  labs(title = "Cantidad de productos distintos comprados por Cluster",
-       x = "Cluster", 
-       y = "Cantidad de productos distintos comprados") +
-  scale_fill_manual("Cluster", values = paleta3) +
-  scale_y_continuous(breaks = seq(0, 175, 25))
-
-damedia = df_cluster %>% group_by(Cluster) %>% summarise(media = mean(dias_activos))
-
-ggplot(damedia, aes(x = Cluster, y = media, fill = Cluster)) +
-  geom_col(color = "#000000") +
-  labs(title = "Media de días activos por Cluster",
-       x = "Cluster", 
-       y = "Media de días activos") +
-  scale_fill_manual("Cluster", values = paleta3) +
-  scale_y_continuous(breaks = seq(0,3,1))
-
-ggplot(df_cluster, aes(x = Cluster, y = media_compras_por_semana, fill = Cluster)) +
-  geom_boxplot() +
-  labs(title = "Media de productos diferentes comprados por semana por Cluster",
-       x = "Cluster", 
-       y = "Media de productos diferentes comprados por semana") +
-  scale_fill_manual("Cluster", values = paleta3) 
-
-ggplot(df_cluster, aes(x = Cluster, y = compras_entre_semana, fill = Cluster)) +
-  geom_boxplot() +
-  labs(title = "Productos diferentes comprados de lunes a jueves por Cluster",
-       x = "Cluster", 
-       y = "Productos diferentes comprados de lunes a jueves") +
-  scale_fill_manual("Cluster", values = paleta3) +
-  scale_y_continuous(breaks = seq(0, 275, 25))
-
-ggplot(df_cluster, aes(x = Cluster, y = compras_fin_de_semana, fill = Cluster)) +
-  geom_boxplot() +
-  labs(title = "Productos diferentes comprados de viernes a domingo por Cluster",
-       x = "Cluster", 
-       y = "Productos diferentes comprados de viernes a domingo") +
-  scale_fill_manual("Cluster", values = paleta3) +
-  scale_y_continuous(breaks = seq(0, 75, 25))
 
