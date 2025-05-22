@@ -1,20 +1,23 @@
 library(recommenderlab)
 library(stringr)
 library(dplyr)
+library(lubridate)
+library(tidyverse)
 
 set.seed(123)
 
 Matriz <- readRDS("Datos/Transformados/matriz_rrm.RDS")
 
+productos <- colnames(Matriz)
+muestra_pro <- sample(productos, 500)
 
-muestra_pro <- sample(Otros_productos, 500)
-
-muestra_cli <- sample(Otros_clientes, 2000)
+clientes <- rownames(Matriz)
+muestra_cli <- sample(clientes, 2000)
 Matriz <- Matriz[muestra_cli,muestra_pro]
 
 head(colnames(Matriz))
 
-esquema <- evaluationScheme(Matriz, method = "split", train = 0.7, given = 3, goodRating = 1)
+esquema <- evaluationScheme(Matriz, method = "split", train = 0.8, given = 3, goodRating = 1)
 
 algoritmos <- list(
   RANDOM = list(name = "RANDOM"),
@@ -28,77 +31,57 @@ algoritmos <- list(
 
 resultados_rmse <- evaluate(esquema, algoritmos, type = "ratings")
 
-resultados_topn <- evaluate(esquema, algoritmos, type = "topNList", n = c(1, 3, 5, 10))
+resultados_topn <- evaluate(esquema, algoritmos, type = "topNList", n = c(1,3,5,10))
+
+resultadosrmse <- avg(resultados_rmse)
+
+avg_results <- avg(resultados_topn)
+print(avg_results[[2]])
+class(avg_results)
+
+nombres_modelos <- names(resultados_topn)
 
 
-metricas_df <- data.frame(
-  Modelo = character(),
-  Precision = numeric(),
-  Recall = numeric(),
-  TPR = numeric(),
-  FPR = numeric(),
-  Accuracy = numeric(),
-  F1 = numeric(),
-  Coverage = numeric(),
-  stringsAsFactors = FALSE
-)
+resultados_completos <- do.call(rbind, lapply(seq_along(avg_results), function(i) {
+  df <- as.data.frame(avg_results[[i]])
+  df$modelo <- names(avg_results)[i]
+  df$index <- seq_len(nrow(df))
+  df
+}))
 
 
+resultados_completos <- resultados_completos[, c("modelo", "n", setdiff(names(resultados_completos), c("modelo", "n", "index")), "index")]
 
-for (nombre_modelo in names(resultados_topn)) {
-  m <- avg(resultados_topn[[nombre_modelo]])
-  
-  precision <- m[, "precision"]
-  recall <- m[, "recall"]
-  tpr <- recall
-  fpr <- m[, "FPR"]
-  
-  # F1 Score
-  f1 <- if ((precision + recall) > 0) {
-    2 * (precision * recall) / (precision + recall)
-  } else {
-    0
-  }
-  
-  # Accuracy estimada
-  accuracy <- precision * recall / (precision + recall - precision * recall)
-  
-  ## NUEVO: Calcular Coverage manualmente
-  # Entrenar modelo con training set
-  modelo_entrenado <- Recommender(getData(esquema, "train"), method = algoritmos[[nombre_modelo]]$name,
-                                  parameter = algoritmos[[nombre_modelo]]$param)
-  
-  # Predecir top-5 para usuarios del conjunto test (parte conocida)
-  predicciones <- predict(modelo_entrenado, getData(esquema, "known"), type = "topNList", n = 5)
-  
-  # Extraer todos los ítems recomendados
-  lista_recomendados <- as(predicciones, "list")
-  items_recomendados <- unique(unlist(lista_recomendados))
-  coverage <- length(items_recomendados) / ncol(matriz)
-  
-  # Guardar métricas
-  metricas_df <- rbind(metricas_df, data.frame(
-    Modelo = nombre_modelo,
-    Precision = round(precision, 3),
-    Recall = round(recall, 3),
-    TPR = round(tpr, 3),
-    FPR = round(fpr, 3),
-    Accuracy = round(accuracy, 3),
-    F1 = round(f1, 3),
-    Coverage = round(coverage, 3)
-  ))
-}
+print(resultados_completos)
+
+colnames(resultados_completos)
+
+resultados_completos$F1 <- with(resultados_completos, {
+  # Manejo de división por cero
+  f1 <- ifelse(precision + recall == 0, NA,
+               2 * (precision * recall) / (precision + recall))
+  return(f1)
+})
+
+df_long <- resultados_completos %>%
+  select(modelo, n, precision, recall, F1) %>%
+  mutate(n = factor(n, levels = sort(unique(n)))) %>%
+  pivot_longer(cols = c(precision, recall, F1), names_to = "metrica", values_to = "valor")
+
+
+# Gráfico
+ggplot(df_long, aes(x = n, y = valor, color = modelo, group = modelo)) +
+  geom_line(size = 1) +
+  geom_point(size = 2) +
+  facet_wrap(~ metrica, scales = "free_y") +
+  labs(title = "Comparación de métricas",
+       x = "Número de recomendaciones",
+       y = "Valor",
+       color = "Algoritmo") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
 
 
 
-saveRDS(resultados, "Datos/Transformados/resultados_comparacion")
-
-resultados <- readRDS("Datos/Transformados/resultados_comparacion")
-
-sapply(resultados, avg)
-plot(resultados, annotate = TRUE, legend = "topleft")
-
-#RMSE
-#precision respecto a recall
 
 
