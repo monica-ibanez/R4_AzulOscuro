@@ -1,11 +1,9 @@
 set.seed(777)
-# Librerías necesarias
 library(data.table)
 library(lubridate)
 library(rsparse)
 library(Matrix)
 
-# Cargar datos
 tickets <- readRDS("Datos/tickets_enc.RDS")
 objetivos <- readRDS("Datos/objetivos.RDS")
 maestroestr <- readRDS("Datos/maestroestr.RDS")
@@ -97,7 +95,7 @@ for (cliente in clientes_olvidadizos) {
   descripcion <- maestroestr[cod_est == producto_rec, descripcion]
   if (length(descripcion) == 0) descripcion <- "Sin descripción"
   
-  # Agregar a resultados
+  # Añadir a resultados
   resultados <- rbind(resultados, data.table(
     id_cliente_enc = cliente,
     recomendacion = producto_rec,
@@ -105,7 +103,6 @@ for (cliente in clientes_olvidadizos) {
   ))
 }
 
-# Mostrar y guardar resultados
 print(resultados)
 saveRDS(resultados, "recomendaciones_als_final.RDS")
 write.csv(resultados, "recomendaciones_als_final.csv", row.names = FALSE)
